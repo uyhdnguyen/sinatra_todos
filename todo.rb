@@ -11,6 +11,7 @@ configure do
   set :session_secret, SecureRandom.hex(32)
 end
 
+#####################################################################################
 =begin  
 HELPER METHODS
 =end
@@ -31,9 +32,27 @@ def error_for_todo(name)
   end
 end
 
-=begin  
-################################################################################################
-=end
+helpers do
+  def list_complete?(list)
+    todos_count > 0 && todos_remaining_count == 0
+  end
+
+  def list_class(list)
+    "complete" if list_complete?(list)
+  end
+
+  def todos_count(list)
+    list[:todos].size
+  end
+
+  def todos_remaining_count(list)
+    list[:todos].select { |todo| todo[:complete] }.size
+  end
+
+end
+
+#####################################################################################
+
 
 before do
   session[:lists] ||= []
@@ -113,13 +132,14 @@ post '/lists/:list_id/todos' do
   @list_id = params[:list_id].to_i
   @list = session[:lists][@list_id]
   text = params[:todo].strip
-
+  p @list
   error = error_for_todo(text)
   if error
     session[:error] = error
     erb :list, layout: :layout
   else
     @list[:todos] << {name: text, completed: false}
+
     session[:success] = "The todo was added."
     redirect "/lists/#{@list_id}"
   end
@@ -134,4 +154,29 @@ post '/lists/:list_id/todos/:id/destroy' do
   @list[:todos].delete_at todo_id
   session[:success] = "The todo has been deleted."
   redirect "lists/#{@list_id}"
+end
+
+# Update status of a todo
+post "/lists/:list_id/todos/:id" do
+  @list_id = params[:list_id].to_i
+  @list = session[:lists][@list_id]
+  
+  todo_id = params[:id].to_i
+  is_completed = params[:completed] == "true"
+  @list[:todos][todo_id][:completed] = is_completed
+  session[:success] = "The todo has been updated"
+  redirect "/lists/#{@list_id}"
+end
+
+# Complete all todos in a todo list
+post "/lists/:id/complete_all" do
+  @list_id = params[:id].to_i
+  @list = session[:lists][@list_id]
+
+  @list[:todos].each do |todo|
+    todo[:completed] = true
+  end
+
+  session[:success] = "All todo have been completed."
+  redirect "/lists/#{@list_id}"
 end
